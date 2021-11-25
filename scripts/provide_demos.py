@@ -2,78 +2,96 @@
 
 import argparse
 import gym
+import pickle
 from gym_minigrid.window import Window
 
 
-def redraw(img):
-    if not args.agent_view:
-        img = env.render('rgb_array', tile_size=args.tile_size)
+class DemosWindow(Window):
+    def __init__(self, title, env, args):
+        super().__init__(title)
+        self.curr_a_seq = []
+        self.curr_s_seq = []
+        self.saved_seqs = []
+        self.env = env
+        self.args = args
+        self.reg_key_handler(self.key_handler)
 
-    window.show_img(img)
+    def redraw(self, img):
+        if not self.args.agent_view:
+            img = self.env.render('rgb_array', tile_size=self.args.tile_size)
 
+        self.show_img(img)
 
-def reset():
-    if args.seed != -1:
-        env.seed(args.seed)
+    def reset(self):
+        if self.args.seed != -1:
+            self.env.seed(self.args.seed)
 
-    obs = env.reset()
+        obs = self.env.reset()
 
-    if hasattr(env, 'mission'):
-        print('Mission: %s' % env.mission)
-        window.set_caption(env.mission)
+        if hasattr(self.env, 'mission'):
+            print('Mission: %s' % self.env.mission)
+            self.set_caption(self.env.mission)
 
-    redraw(obs)
+        self.curr_a_seq = []
+        self.curr_s_seq = []
+        self.curr_s_seq.append(obs)
+        self.redraw(obs)
 
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.curr_a_seq.append(action)
+        self.curr_s_seq.append(obs)
 
-def step(action):
-    obs, reward, done, info = env.step(action)
-    print('step=%s, reward=%.2f' % (env.step_count, reward))
+        if done:
+            print('done!')
+            self.saved_seqs.append(list(zip(self.curr_s_seq, self.curr_a_seq)))
+            self.reset()
+        else:
+            self.redraw(obs)
 
-    if done:
-        print('done!')
-        reset()
-    else:
-        redraw(obs)
+    def key_handler(self, event):
+        print('pressed', event.key)
 
+        if event.key == 'escape':
+            for ix, seq in enumerate(self.saved_seqs):
+                pickle.dump(seq, open(f'exp_traj{ix}.pkl', 'wb'))
 
-def key_handler(event):
-    print('pressed', event.key)
+            self.close()
+            return
 
-    if event.key == 'escape':
-        window.close()
-        return
+        if event.key == 'backspace':
+            self.reset()
+            return
 
-    if event.key == 'backspace':
-        reset()
-        return
+        if event.key == 'left':
+            self.step(self.env.actions.left)
+            return
+        if event.key == 'right':
+            self.step(self.env.actions.right)
+            return
+        if event.key == 'up':
+            self.step(self.env.actions.forward)
+            return
 
-    if event.key == 'left':
-        step(env.actions.left)
-        return
-    if event.key == 'right':
-        step(env.actions.right)
-        return
-    if event.key == 'up':
-        step(env.actions.forward)
-        return
+        # Spacebar
+        if event.key == ' ':
+            self.step(self.env.actions.toggle)
+            return
+        if event.key == 'p':
+            self.step(self.env.actions.pickup)
+            return
+        if event.key == 'd':
+            self.step(self.env.actions.drop)
+            return
 
-    # Spacebar
-    if event.key == ' ':
-        step(env.actions.toggle)
-        return
-    if event.key == 'p':
-        step(env.actions.pickup)
-        return
-    if event.key == 'd':
-        step(env.actions.drop)
-        return
-
-    if event.key == 'enter':
-        step(env.actions.done)
-        return
+        if event.key == 'enter':
+            self.step(self.env.actions.done)
+            return
 
 
 if __name__ == '__main__':
+    states = []
+    actions = []
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--env",
@@ -100,10 +118,9 @@ if __name__ == '__main__':
     #     env = RGBImgPartialObsWrapper(env)
     #     env = ImgObsWrapper(env)
 
-    window = Window('gym_minigrid - ' + args.env)
-    window.reg_key_handler(key_handler)
+    window = DemosWindow('gym_minigrid - ' + args.env, env, args)
 
-    reset()
+    window.reset()
 
     # Blocking event loop
     window.show(block=True)
