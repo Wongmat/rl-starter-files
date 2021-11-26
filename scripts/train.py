@@ -8,6 +8,7 @@ import sys
 import utils
 from utils import device
 from model import ACModel
+from GAIL import GAILModel, GAILAlgo
 
 if __name__ == '__main__':
     # Parse arguments
@@ -171,29 +172,37 @@ if __name__ == '__main__':
 
     # Load model
 
-    acmodel = ACModel(obs_space, envs[0].action_space, args.mem, args.text)
+    model = GAILModel(obs_space, envs[0].action_space, args.mem,
+                      args.text) if args.algo == 'gail' else ACModel(
+                          obs_space, envs[0].action_space, args.mem, args.text)
     if "model_state" in status:
-        acmodel.load_state_dict(status["model_state"])
-    acmodel.to(device)
+        model.load_state_dict(status["model_state"])
+    model.to(device)
     txt_logger.info("Model loaded\n")
-    txt_logger.info("{}\n".format(acmodel))
+    txt_logger.info("{}\n".format(model))
 
     # Load algo
 
     if args.algo == "a2c":
-        algo = torch_ac.A2CAlgo(envs, acmodel, device, args.frames_per_proc,
+        algo = torch_ac.A2CAlgo(envs, model, device, args.frames_per_proc,
                                 args.discount, args.lr, args.gae_lambda,
                                 args.entropy_coef, args.value_loss_coef,
                                 args.max_grad_norm, args.recurrence,
                                 args.optim_alpha, args.optim_eps,
                                 preprocess_obss)
     elif args.algo == "ppo":
-        algo = torch_ac.PPOAlgo(envs, acmodel, device, args.frames_per_proc,
+        algo = torch_ac.PPOAlgo(envs, model, device, args.frames_per_proc,
                                 args.discount, args.lr, args.gae_lambda,
                                 args.entropy_coef, args.value_loss_coef,
                                 args.max_grad_norm, args.recurrence,
                                 args.optim_eps, args.clip_eps, args.epochs,
                                 args.batch_size, preprocess_obss)
+    elif args.algo == "gail":
+        algo = GAILAlgo(envs, model, device, args.frames_per_proc,
+                        args.discount, args.lr, args.gae_lambda,
+                        args.entropy_coef, args.value_loss_coef,
+                        args.max_grad_norm, args.recurrence, args.optim_alpha,
+                        args.optim_eps, preprocess_obss)
     else:
         raise ValueError("Incorrect algorithm name: {}".format(args.algo))
 
@@ -267,7 +276,7 @@ if __name__ == '__main__':
             status = {
                 "num_frames": num_frames,
                 "update": update,
-                "model_state": acmodel.state_dict(),
+                "model_state": model.state_dict(),
                 "optimizer_state": algo.optimizer.state_dict()
             }
             if hasattr(preprocess_obss, "vocab"):

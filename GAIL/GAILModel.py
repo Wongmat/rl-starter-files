@@ -16,12 +16,14 @@ def init_params(m):
             m.bias.data.fill_(0)
 
 
-class ACModel(nn.Module, torch_ac.RecurrentACModel):
-    def __init__(self,
-                 obs_space,
-                 action_space,
-                 use_memory=False,
-                 use_text=False):
+class GAILModel(nn.Module, torch_ac.RecurrentACModel):
+    def __init__(
+        self,
+        obs_space,
+        action_space,
+        use_memory=False,
+        use_text=False,
+    ):
         super().__init__()
 
         # Decide which components are enabled
@@ -37,11 +39,6 @@ class ACModel(nn.Module, torch_ac.RecurrentACModel):
         m = obs_space["image"][1]
         self.image_embedding_size = ((n - 1) // 2 - 2) * (
             (m - 1) // 2 - 2) * 64
-
-        # Define memory
-        if self.use_memory:
-            self.memory_rnn = nn.LSTMCell(self.image_embedding_size,
-                                          self.semi_memory_size)
 
         # Define text embedding
         if self.use_text:
@@ -59,15 +56,19 @@ class ACModel(nn.Module, torch_ac.RecurrentACModel):
             self.embedding_size += self.text_embedding_size
 
         # Define actor's model
-        self.actor = nn.Sequential(nn.Linear(self.embedding_size, 64),
-                                   nn.Tanh(), nn.Linear(64, action_space.n))
-
+        self.hidden_dim = 64
+        self.actor = nn.Sequential(
+            nn.Linear(self.embedding_size, self.hidden_dim), nn.Tanh(),
+            nn.Linear(self.hidden_dim, self.hidden_dim), nn.Tanh(),
+            nn.Linear(self.hidden_dim, 1))
         # Define critic's model
-        self.critic = nn.Sequential(nn.Linear(self.embedding_size, 64),
-                                    nn.Tanh(), nn.Linear(64, 1))
-
-        # Initialize parameters correctly
-        self.apply(init_params)
+        self.d_input_dim = 100
+        self.discriminator = nn.Sequential(
+            nn.Linear(self.d_input_dim, self.hidden_dim), nn.Tanh(),
+            nn.Linear(self.hidden_dim, self.hidden_dim), nn.Tanh(),
+            nn.Linear(self.hidden_dim, 1))
+        # # Initialize parameters correctly
+        # self.apply(init_params)
 
     @property
     def memory_size(self):
@@ -80,16 +81,7 @@ class ACModel(nn.Module, torch_ac.RecurrentACModel):
     def forward(self, obs, memory):
         x = obs.image.transpose(1, 3).transpose(2, 3)
         x = self.image_conv(x)
-        x = x.reshape(x.shape[0], -1)
-
-        if self.use_memory:
-            hidden = (memory[:, :self.semi_memory_size],
-                      memory[:, self.semi_memory_size:])
-            hidden = self.memory_rnn(x, hidden)
-            embedding = hidden[0]
-            memory = torch.cat(hidden, dim=1)
-        else:
-            embedding = x
+        embedding = x.reshape(x.shape[0], -1)
 
         if self.use_text:
             embed_text = self._get_embed_text(obs.text)
