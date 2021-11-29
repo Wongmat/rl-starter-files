@@ -84,7 +84,7 @@ class GAILModel(nn.Module, torch_ac.RecurrentACModel):
         embedding = x.reshape(x.shape[0], -1)
 
         if self.use_text:
-            embed_text = self._get_embed_text(obs.text)
+            embed_text = self._get_embed_text(obs.mission)
             embedding = torch.cat((embedding, embed_text), dim=1)
 
         x = self.actor(embedding)

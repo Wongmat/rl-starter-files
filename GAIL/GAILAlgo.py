@@ -1,8 +1,11 @@
 import numpy
 import torch
+import os
 import torch.nn.functional as F
 import pickle
 from torch_ac.algos.base import BaseAlgo
+
+TRAJ_FOLDER = 'example_trajs/'
 
 
 class GAILAlgo(BaseAlgo):
@@ -36,9 +39,31 @@ class GAILAlgo(BaseAlgo):
                                              eps=rmsprop_eps)
 
     def collect_experiences(self):
-        exp_traj = pickle.load(open('example_trajs/exp_traj0.pkl', 'rb'))
-        print(exp_traj[0][0]['image'].shape)
-        raise 'LOL'
+        path = TRAJ_FOLDER + '/exp_traj0.pkl'
+        all_img = None
+        all_text = None
+        actions = []
+        counter = 0
+
+        while os.path.exists(path):
+            exp_traj = pickle.load(open(path, 'rb'))
+
+            obs = self.preprocess_obss(
+                [raw_state for raw_state, _ in exp_traj])
+
+            all_img = obs.image if all_img is None else torch.cat(
+                (all_img, obs.image), dim=0)
+            all_text = obs.text if all_text is None else torch.cat(
+                (all_text, obs.text), dim=0)
+            for _, action in exp_traj:
+                actions.append(action)
+
+            counter += 1
+            path = TRAJ_FOLDER + f'/exp_traj{counter}.pkl'
+
+        logs = None
+
+        return {'images': all_img, 'text': all_text, 'actions': actions}, logs
 
     def update_parameters(self, exps):
         # Compute starting indexes
