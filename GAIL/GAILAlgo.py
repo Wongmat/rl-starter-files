@@ -40,22 +40,15 @@ class GAILAlgo(BaseAlgo):
 
     def collect_experiences(self):
         path = TRAJ_FOLDER + '/exp_traj0.pkl'
-        all_img = None
-        all_text = None
+        obs = []
         actions = []
         counter = 0
 
         while os.path.exists(path):
             exp_traj = pickle.load(open(path, 'rb'))
 
-            obs = self.preprocess_obss(
-                [raw_state for raw_state, _ in exp_traj])
-
-            all_img = obs.image if all_img is None else torch.cat(
-                (all_img, obs.image), dim=0)
-            all_text = obs.text if all_text is None else torch.cat(
-                (all_text, obs.text), dim=0)
-            for _, action in exp_traj:
+            for state, action in exp_traj:
+                obs.append(state)
                 actions.append(action)
 
             counter += 1
@@ -63,7 +56,9 @@ class GAILAlgo(BaseAlgo):
 
         logs = None
 
-        return {'images': all_img, 'text': all_text, 'actions': actions}, logs
+        obs = self.preprocess_obss(obs)
+
+        return {'obs': obs, 'actions': actions}, logs
 
     def update_parameters(self, exps):
         # Compute starting indexes
@@ -80,20 +75,22 @@ class GAILAlgo(BaseAlgo):
 
         # Initialize memory
 
+        self.acmodel.recurrent = False
         if self.acmodel.recurrent:
             memory = exps.memory[inds]
 
         for i in range(self.recurrence):
             # Create a sub-batch of experience
 
-            sb = exps[inds + i]
+            # sb = exps[inds + i]
 
             # Compute loss
 
             if self.acmodel.recurrent:
                 dist, value, memory = self.acmodel(sb.obs, memory * sb.mask)
             else:
-                dist, value = self.acmodel(sb.obs)
+                embedding = self.acmodel.embed_obs(exps['obs'])
+                x = self.acmodel.discriminator(embedding)
 
             entropy = dist.entropy().mean()
 
