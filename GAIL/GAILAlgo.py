@@ -33,10 +33,11 @@ class GAILAlgo(BaseAlgo):
                          max_grad_norm, recurrence, preprocess_obss,
                          reshape_reward)
 
-        self.optimizer = torch.optim.RMSprop(self.acmodel.parameters(),
-                                             lr,
-                                             alpha=rmsprop_alpha,
-                                             eps=rmsprop_eps)
+        self.optim_discriminator = torch.optim.Adam(
+            self.acmodel.discriminator.parameters(), lr=lr)
+
+        self.optim_actor = torch.optim.Adam(self.acmodel.actor.parameters(),
+                                            lr=lr)
 
     def collect_experiences(self):
         path = TRAJ_FOLDER + '/exp_traj0.pkl'
@@ -79,7 +80,9 @@ class GAILAlgo(BaseAlgo):
         if self.acmodel.recurrent:
             memory = exps.memory[inds]
 
-        for i in range(self.recurrence):
+        embedding = self.acmodel.embed_obs(exps['obs'])
+        batch_size = 8
+        for i in range(0, embedding.shape[0], batch_size):
             # Create a sub-batch of experience
 
             # sb = exps[inds + i]
@@ -89,8 +92,14 @@ class GAILAlgo(BaseAlgo):
             if self.acmodel.recurrent:
                 dist, value, memory = self.acmodel(sb.obs, memory * sb.mask)
             else:
-                embedding = self.acmodel.embed_obs(exps['obs'])
-                x = self.acmodel.discriminator(embedding)
+                batch_emb = embedding[i:i + batch_size]
+                batch_act = exps['actions'][i:i + batch_size]
+                int_acts = torch.Tensor([int(act) for act in batch_act])
+                d_input = torch.cat((batch_emb, int_acts.unsqueeze(1)), 1)
+                d_output = self.acmodel.discriminator(d_input)
+                d_loss = F.binary_cross_entropy(
+                    d_output,
+                    torch.full((batch_size, 1), 1).float())
 
             entropy = dist.entropy().mean()
 

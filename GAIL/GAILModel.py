@@ -62,11 +62,11 @@ class GAILModel(nn.Module, torch_ac.RecurrentACModel):
             nn.Linear(self.hidden_dim, self.hidden_dim), nn.Tanh(),
             nn.Linear(self.hidden_dim, 1))
         # Define critic's model
-        self.d_input_dim = 192
+        self.d_input_dim = 193
         self.discriminator = nn.Sequential(
             nn.Linear(self.d_input_dim, self.hidden_dim), nn.Tanh(),
             nn.Linear(self.hidden_dim, self.hidden_dim), nn.Tanh(),
-            nn.Linear(self.hidden_dim, 2))
+            nn.Linear(self.hidden_dim, 1), nn.Sigmoid())
         # # Initialize parameters correctly
         # self.apply(init_params)
 
