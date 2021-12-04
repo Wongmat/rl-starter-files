@@ -17,7 +17,7 @@ def create_folders_if_necessary(path):
 def get_storage_dir():
     if "RL_STORAGE" in os.environ:
         return os.environ["RL_STORAGE"]
-    return "storage"
+    return "mg_a2c/storage"
 
 
 def get_model_dir(model_name):
@@ -25,6 +25,8 @@ def get_model_dir(model_name):
 
 
 def get_status_path(model_dir):
+    if 'mg_a2c/' not in model_dir:
+        model_dir = 'mg_a2c/storage/' + model_dir
     return os.path.join(model_dir, "status.pt")
 
 
@@ -51,14 +53,12 @@ def get_txt_logger(model_dir):
     path = os.path.join(model_dir, "log.txt")
     utils.create_folders_if_necessary(path)
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-        handlers=[
-            logging.FileHandler(filename=path),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    logging.basicConfig(level=logging.INFO,
+                        format="%(message)s",
+                        handlers=[
+                            logging.FileHandler(filename=path),
+                            logging.StreamHandler(sys.stdout)
+                        ])
 
     return logging.getLogger()
 
