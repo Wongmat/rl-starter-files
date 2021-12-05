@@ -60,7 +60,7 @@ class GAILModel(nn.Module, torch_ac.RecurrentACModel):
         self.actor = nn.Sequential(
             nn.Linear(self.embedding_size, self.hidden_dim), nn.Tanh(),
             nn.Linear(self.hidden_dim, self.hidden_dim), nn.Tanh(),
-            nn.Linear(self.hidden_dim, 1))
+            nn.Linear(self.hidden_dim, action_space.n), nn.LogSoftmax(dim=1))
         # Define critic's model
         self.d_input_dim = 193
         self.discriminator = nn.Sequential(
@@ -91,13 +91,9 @@ class GAILModel(nn.Module, torch_ac.RecurrentACModel):
     def forward(self, obs, memory):
         embedding = self.embed_obs(obs)
 
-        x = self.actor(embedding)
-        dist = Categorical(logits=F.log_softmax(x, dim=1))
+        dist = self.actor(embedding)
 
-        x = self.discriminator(embedding)
-        value = x.squeeze(1)
-
-        return dist, value, memory
+        return dist
 
     def _get_embed_text(self, text):
         _, hidden = self.text_rnn(self.word_embedding(text))

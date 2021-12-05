@@ -55,8 +55,12 @@ class GAILAlgo(BaseAlgo):
             counter += 1
             path = TRAJ_FOLDER + f'/exp_traj{counter}.pkl'
 
-        logs = None
-
+        logs = {
+            "return_per_episode": 0,
+            "reshaped_return_per_episode": 0,
+            "num_frames_per_episode": 0,
+            "num_frames": len(actions)
+        }
         obs = self.preprocess_obss(obs)
 
         return {'obs': obs, 'actions': actions}, logs
@@ -68,11 +72,8 @@ class GAILAlgo(BaseAlgo):
 
         # Initialize update values
 
-        update_entropy = 0
-        update_value = 0
-        update_policy_loss = 0
-        update_value_loss = 0
-        update_loss = 0
+        update_disc_loss = 0
+        update_actor_loss = 0
 
         # Initialize memory
 
@@ -81,7 +82,7 @@ class GAILAlgo(BaseAlgo):
             memory = exps.memory[inds]
 
         embedding = self.acmodel.embed_obs(exps['obs'])
-        batch_size = 8
+        batch_size = embedding.shape[0]
         for i in range(0, embedding.shape[0], batch_size):
             # Create a sub-batch of experience
 
@@ -94,55 +95,43 @@ class GAILAlgo(BaseAlgo):
             else:
                 batch_emb = embedding[i:i + batch_size]
                 batch_act = exps['actions'][i:i + batch_size]
-                int_acts = torch.Tensor([int(act) for act in batch_act])
-                d_input = torch.cat((batch_emb, int_acts.unsqueeze(1)), 1)
-                d_output = self.acmodel.discriminator(d_input)
+                exp_acts = torch.Tensor([int(act) for act in batch_act])
+                exp_input = torch.cat((batch_emb, exp_acts.unsqueeze(1)), 1)
+
+                act_acts = torch.argmax(self.acmodel.actor(batch_emb), dim=1)
+                print(act_acts)
+                act_input = torch.cat((batch_emb, act_acts.unsqueeze(1)), 1)
+                self.optim_discriminator.zero_grad()
+
+                exp_d_output = self.acmodel.discriminator(exp_input)
+                act_d_output = self.acmodel.discriminator(act_input)
                 d_loss = F.binary_cross_entropy(
-                    d_output,
+                    exp_d_output,
                     torch.full((batch_size, 1), 1).float())
 
-            entropy = dist.entropy().mean()
+                d_loss += F.binary_cross_entropy(
+                    act_d_output,
+                    torch.full((batch_size, 1), 0).float())
 
-            policy_loss = -(dist.log_prob(sb.action) * sb.advantage).mean()
+                d_loss.backward(retain_graph=True)
+                self.optim_discriminator.step()
 
-            value_loss = (value - sb.returnn).pow(2).mean()
+                self.optim_actor.zero_grad()
 
-            loss = policy_loss - self.entropy_coef * entropy + self.value_loss_coef * value_loss
+                a_loss = -self.acmodel.discriminator(act_input).mean()
+                a_loss.backward()
+                self.optim_actor.step()
 
             # Update batch values
 
-            update_entropy += entropy.item()
-            update_value += value.mean().item()
-            update_policy_loss += policy_loss.item()
-            update_value_loss += value_loss.item()
-            update_loss += loss
-
-        # Update update values
-
-        update_entropy /= self.recurrence
-        update_value /= self.recurrence
-        update_policy_loss /= self.recurrence
-        update_value_loss /= self.recurrence
-        update_loss /= self.recurrence
-
-        # Update actor-critic
-
-        self.optimizer.zero_grad()
-        update_loss.backward()
-        update_grad_norm = sum(
-            p.grad.data.norm(2)**2 for p in self.acmodel.parameters())**0.5
-        torch.nn.utils.clip_grad_norm_(self.acmodel.parameters(),
-                                       self.max_grad_norm)
-        self.optimizer.step()
+            update_disc_loss += d_loss.item()
+            update_actor_loss += a_loss.item()
 
         # Log some values
 
         logs = {
-            "entropy": update_entropy,
-            "value": update_value,
-            "policy_loss": update_policy_loss,
-            "value_loss": update_value_loss,
-            "grad_norm": update_grad_norm
+            "discriminator loss": update_disc_loss,
+            "actor loss": update_actor_loss,
         }
 
         return logs

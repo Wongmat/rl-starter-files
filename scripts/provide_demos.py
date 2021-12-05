@@ -19,6 +19,7 @@ class DemosWindow(Window):
     def redraw(self, img):
         if not self.args.agent_view:
             img = self.env.render('rgb_array', tile_size=self.args.tile_size)
+            self.env.window.close()
 
         self.show_img(img)
 
@@ -112,7 +113,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    env = gym.make(args.env)
+    env = gym.make(args.env_name)
 
     # if args.agent_view:
     #     env = RGBImgPartialObsWrapper(env)

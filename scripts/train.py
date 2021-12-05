@@ -247,16 +247,18 @@ if __name__ == '__main__':
                 "num_frames_" + key for key in num_frames_per_episode.keys()
             ]
             data += num_frames_per_episode.values()
-            header += [
-                "entropy", "value", "policy_loss", "value_loss", "grad_norm"
-            ]
+            header += ["discriminator_loss", "actor_loss"]
             data += [
-                logs["entropy"], logs["value"], logs["policy_loss"],
-                logs["value_loss"], logs["grad_norm"]
+                logs["discriminator loss"],
+                logs["actor loss"],
             ]
-
+            """
             txt_logger.info(
                 "U {} | F {:06} | FPS {:04.0f} | D {} | rR:μσmM {:.2f} {:.2f} {:.2f} {:.2f} | F:μσmM {:.1f} {:.1f} {} {} | H {:.3f} | V {:.3f} | pL {:.3f} | vL {:.3f} | ∇ {:.3f}"
+                .format(*data))
+           """
+            txt_logger.info(
+                "U {} | F {:06} | FPS {:04.0f} | D {} | rR:μσmM {:.2f} {:.2f} {:.2f} {:.2f} | F:μσmM {:.1f} {:.1f} {} {} | D Loss {:.3f} | A Loss {:.3f} "
                 .format(*data))
 
             header += ["return_" + key for key in return_per_episode.keys()]
@@ -277,7 +279,7 @@ if __name__ == '__main__':
                 "num_frames": num_frames,
                 "update": update,
                 "model_state": model.state_dict(),
-                "optimizer_state": algo.optimizer.state_dict()
+                "optimizer_state": algo.optim_actor.state_dict()
             }
             if hasattr(preprocess_obss, "vocab"):
                 status["vocab"] = preprocess_obss.vocab.vocab
