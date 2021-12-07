@@ -15,20 +15,28 @@ def get_obss_preprocessor(obs_space):
         obs_space = {"image": obs_space.shape}
 
         def preprocess_obss(obss, device=None):
-            return torch_ac.DictList({
-                "image": preprocess_images(obss, device=device)
-            })
+            return torch_ac.DictList(
+                {"image": preprocess_images(obss, device=device)})
 
     # Check if it is a MiniGrid observation space
-    elif isinstance(obs_space, gym.spaces.Dict) and list(obs_space.spaces.keys()) == ["image"]:
+    elif isinstance(obs_space, gym.spaces.Dict) and list(
+            obs_space.spaces.keys()) == ["image"]:
         obs_space = {"image": obs_space.spaces["image"].shape, "text": 100}
 
         vocab = Vocabulary(obs_space["text"])
+
         def preprocess_obss(obss, device=None):
             return torch_ac.DictList({
-                "image": preprocess_images([obs["image"] for obs in obss], device=device),
-                "text": preprocess_texts([obs["mission"] for obs in obss], vocab, device=device)
+                "image":
+                preprocess_images([obs["image"] for obs in obss],
+                                  device=device),
+                "text":
+                preprocess_texts([obs["mission"] for obs in obss],
+                                 vocab,
+                                 device=device),
+                "full_res": [obs["full_res_observable_img"] for obs in obss]
             })
+
         preprocess_obss.vocab = vocab
 
     else:
@@ -64,7 +72,6 @@ def preprocess_texts(texts, vocab, device=None):
 class Vocabulary:
     """A mapping from tokens to ids with a capacity of `max_size` words.
     It can be saved in a `vocab.json` file."""
-
     def __init__(self, max_size):
         self.max_size = max_size
         self.vocab = {}
