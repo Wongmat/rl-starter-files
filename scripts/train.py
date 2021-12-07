@@ -8,6 +8,7 @@ import sys
 import utils
 from utils import device
 from model import ACModel
+import vilt.vision_transformer as vit
 
 # Parse arguments
 
@@ -164,8 +165,9 @@ if __name__ == "__main__":
 
     # Load observations preprocessor
 
+    transformer = getattr(vit, "vit_small_patch16_160")(pretrained=True)
     obs_space, preprocess_obss = utils.get_obss_preprocessor(
-        envs[0].observation_space)
+        envs[0].observation_space, transformer)
     if "vocab" in status:
         preprocess_obss.vocab.load_vocab(status["vocab"])
     txt_logger.info("Observations preprocessor loaded")

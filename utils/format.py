@@ -9,7 +9,7 @@ import gym
 import utils
 
 
-def get_obss_preprocessor(obs_space):
+def get_obss_preprocessor(obs_space, transformer):
     # Check if obs_space is an image space
     if isinstance(obs_space, gym.spaces.Box):
         obs_space = {"image": obs_space.shape}
@@ -29,12 +29,12 @@ def get_obss_preprocessor(obs_space):
             return torch_ac.DictList({
                 "image":
                 preprocess_images([obs["image"] for obs in obss],
+                                  transformer,
                                   device=device),
                 "text":
                 preprocess_texts([obs["mission"] for obs in obss],
                                  vocab,
                                  device=device),
-                "full_res": [obs["full_res_observable_img"] for obs in obss]
             })
 
         preprocess_obss.vocab = vocab
@@ -45,10 +45,23 @@ def get_obss_preprocessor(obs_space):
     return obs_space, preprocess_obss
 
 
-def preprocess_images(images, device=None):
+def preprocess_images(images, transformer, device=None):
     # Bug of Pytorch: very slow if not first converted to numpy array
-    images = numpy.array(images)
-    return torch.tensor(images, device=device, dtype=torch.float)
+    images = torch.tensor(numpy.array(images),
+                          device=device,
+                          dtype=torch.float)
+    # (
+    #     image_embeds,
+    #     image_masks,
+    #     patch_index,
+    #     image_labels,
+    # ) = transformer.visual_embed(
+    #     images,
+    #     max_image_len=-1,
+    # )
+    # print(image_embeds)
+
+    return images
 
 
 def preprocess_texts(texts, vocab, device=None):

@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 import torch_ac
-import vilt.vision_transformer as vit
 
 
 # Function from https://github.com/ikostrikov/pytorch-a2c-ppo-acktr/blob/master/model.py
@@ -28,8 +27,6 @@ class ACModel(nn.Module, torch_ac.RecurrentACModel):
         # Decide which components are enabled
         self.use_text = use_text
         self.use_memory = use_memory
-        self.transformer = getattr(vit,
-                                   "vit_base_patch32_384")(pretrained=True)
         # Define image embedding
         self.image_conv = nn.Sequential(nn.Conv2d(3, 16, (2, 2)), nn.ReLU(),
                                         nn.MaxPool2d((2, 2)),
@@ -80,16 +77,6 @@ class ACModel(nn.Module, torch_ac.RecurrentACModel):
         return self.image_embedding_size
 
     def forward(self, obs, memory):
-        (
-            image_embeds,
-            image_masks,
-            patch_index,
-            image_labels,
-        ) = self.transformer.visual_embed(
-            torch.tensor(obs[0].full_res).unsqueeze(0),
-            max_image_len=-1,
-        )
-        print(image_embeds)
 
         x = obs.image.transpose(1, 3).transpose(2, 3)
         x = self.image_conv(x)
