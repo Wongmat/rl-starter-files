@@ -91,7 +91,6 @@ class ACModel(nn.Module, torch_ac.RecurrentACModel):
         # )
         # print(image_embeds)
 
-        # raise 'NO'
         x = obs.image.transpose(1, 3).transpose(2, 3)
         x = self.image_conv(x)
         x = x.reshape(x.shape[0], -1)
