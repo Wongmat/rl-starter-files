@@ -28,9 +28,11 @@ def get_obss_preprocessor(obs_space, transformer):
         def preprocess_obss(obss, device=None):
             return torch_ac.DictList({
                 "image":
-                preprocess_images([obs["image"] for obs in obss],
-                                  transformer,
-                                  device=device),
+                preprocess_images(
+                    [obs["image"].T
+                     for obs in obss],  # Transposed to fit with transformer
+                    transformer,
+                    device=device),
                 "text":
                 preprocess_texts([obs["mission"] for obs in obss],
                                  vocab,
@@ -50,16 +52,16 @@ def preprocess_images(images, transformer, device=None):
     images = torch.tensor(numpy.array(images),
                           device=device,
                           dtype=torch.float)
-    # (
-    #     image_embeds,
-    #     image_masks,
-    #     patch_index,
-    #     image_labels,
-    # ) = transformer.visual_embed(
-    #     images,
-    #     max_image_len=-1,
-    # )
-    # print(image_embeds)
+    (
+        image_embeds,
+        image_masks,
+        patch_index,
+        image_labels,
+    ) = transformer.visual_embed(
+        images,
+        max_image_len=-1,
+    )
+    print(image_embeds)
 
     return images
 
