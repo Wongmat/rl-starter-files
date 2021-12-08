@@ -39,6 +39,9 @@ class CustomMGEnv(object):
         ob, rwd, done, info = self.__env.step(act)
         full_img, observable_img = self.render('rgb_array',
                                                tile_size=TILE_SIZE)
+        if done and rwd > 0:
+            info = {'pct_max_steps_success': self.step_count / self.max_steps}
+
         ob['full_res_observable_img'] = self.preprocess_img(
             observable_img,
             (self.__env.height * TILE_SIZE, self.__env.width * TILE_SIZE),
